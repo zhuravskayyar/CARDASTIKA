@@ -240,12 +240,7 @@ async function ensureGameAccount(name) {
 
 startNewBtn?.addEventListener("click", async () => {
   markOnboardingSeen();
-  localStorage.removeItem(ACTIVE_KEY);
-  localStorage.removeItem("activeAccount");
-  localStorage.removeItem("cardastika:profile");
-  localStorage.removeItem("cardastika:avatarUrl");
-  sessionStorage.removeItem("openCard");
-
+  
   // Start as a new local player: force starter deck/resources.
   try {
     const starterDeck = await createStarterDeck();
@@ -255,8 +250,12 @@ startNewBtn?.addEventListener("click", async () => {
     localStorage.setItem("cardastika:diamonds", String(STARTER_DIAMONDS));
     localStorage.setItem("cardastika:silver", String(STARTER_SILVER));
     localStorage.setItem("cardastika:gems", String(STARTER_SILVER));
+    
     // Set a session flag to show main screen
     localStorage.setItem("cardastika:player", "new-game");
+    // Set active player name so profile shows it
+    localStorage.setItem(ACTIVE_KEY, "new-game");
+    localStorage.setItem(REMEMBER_KEY, "1");
   } catch (err) {
     console.warn("[auth] failed to prepare starter state for new game", err);
   }
