@@ -145,12 +145,8 @@ function redirectAfterAuth() {
     window.location.href = "../profile/profile.html";
     return;
   }
-  // Show main screen instead of redirecting
-  if (window.screenController?.showMainScreen) {
-    window.screenController.showMainScreen();
-  } else {
-    window.location.href = "../../index.html";
-  }
+  // Redirect to main game page
+  window.location.href = "../../index.html";
 }
 
 function rarityToNumber(raw) {
@@ -265,12 +261,8 @@ startNewBtn?.addEventListener("click", async () => {
     console.warn("[auth] failed to prepare starter state for new game", err);
   }
 
-  // Show main screen instead of redirecting
-  if (window.screenController?.showMainScreen) {
-    window.screenController.showMainScreen();
-  } else {
-    window.location.href = "../../index.html";
-  }
+  // Redirect to main game page
+  window.location.href = "../../index.html";
 });
 
 startLoginBtn?.addEventListener("click", () => {
