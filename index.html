@@ -190,32 +190,38 @@
   </div>
 
   <script type="module">
-    // Check if user has active session
-    const userSession = localStorage.getItem('cardastika:player');
+    // ============================================================
+    // Screen Controller: Manages Auth and Main Screen visibility
+    // based on active user session
+    // ============================================================
+    
     const authScreen = document.getElementById('authScreen');
     const mainScreen = document.getElementById('mainScreen');
     const botbar = document.getElementById('botbar');
 
     function showAuthScreen() {
-      authScreen.style.display = '';
-      mainScreen.style.display = 'none';
-      botbar.style.display = 'none';
+      if (authScreen) authScreen.style.display = 'block';
+      if (mainScreen) mainScreen.style.display = 'none';
+      if (botbar) botbar.style.display = 'none';
     }
 
     function showMainScreen() {
-      authScreen.style.display = 'none';
-      mainScreen.style.display = '';
-      botbar.style.display = '';
+      if (authScreen) authScreen.style.display = 'none';
+      if (mainScreen) mainScreen.style.display = 'block';
+      if (botbar) botbar.style.display = 'grid';
     }
 
-    // Show appropriate screen based on session
+    // Determine if user has an active session
+    const userSession = localStorage.getItem('cardastika:player');
+    
+    // Show appropriate screen based on session on page load
     if (userSession) {
       showMainScreen();
     } else {
       showAuthScreen();
     }
 
-    // Export for auth script
+    // Export for auth script and other modules
     window.screenController = { showAuthScreen, showMainScreen };
   </script>
 

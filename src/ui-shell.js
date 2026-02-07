@@ -20,21 +20,32 @@ function ensureMojibakeRepairer() {
 ensureMojibakeRepairer();
 
 function getRoutes() {
-  // Compute BASE_PATH for deployments (GitHub Pages uses username.github.io/<repo>/)
-  const path = location.pathname.replaceAll("\\", "/");
-  const parts = path.split("/").filter(Boolean);
-  const isGithub = location.hostname.endsWith("github.io");
-  const BASE_PATH = isGithub && parts.length ? `/${parts[0]}/` : "/";
-
-  return {
-    home:        `${BASE_PATH}index.html`,
-    deck:        `${BASE_PATH}pages/deck/deck.html`,
-    guild:       `${BASE_PATH}pages/guild/guild.html`,
-    shop:        `${BASE_PATH}pages/shop/shop.html`,
-    collections: `${BASE_PATH}pages/collections/collections.html`,
-    duel:        `${BASE_PATH}pages/duel/duel.html`,
-    profile:     `${BASE_PATH}pages/profile/profile.html`,
-  };
+  // Р’РёР·РЅР°С‡Р°С”РјРѕ, С‡Рё РјРё РЅР° РіРѕР»РѕРІРЅС–Р№ СЃС‚РѕСЂС–РЅС†С– С‡Рё РІ РїС–РґРїР°РїС†С– pages
+  const isInPages = location.pathname.toLowerCase().includes("/pages/");
+  
+  if (isInPages) {
+    // РЇРєС‰Рѕ РІ pages/[name]/, С€Р»СЏС…Рё РІС–РґРЅРѕСЃРЅС– РґРѕ РїРѕС‚РѕС‡РЅРѕС— РїР°РїРєРё
+    return {
+      home:        "../../index.html",
+      deck:        "../deck/deck.html",
+      guild:       "../guild/guild.html",
+      shop:        "../shop/shop.html",
+      collections: "../collections/collections.html",
+      duel:        "../duel/duel.html",
+      profile:     "../profile/profile.html",
+    };
+  } else {
+    // РЇРєС‰Рѕ РЅР° РіРѕР»РѕРІРЅС–Р№ СЃС‚РѕСЂС–РЅС†С–, С€Р»СЏС…Рё С–РЅС€С–
+    return {
+      home:        "./index.html",
+      deck:        "./pages/deck/deck.html",
+      guild:       "./pages/guild/guild.html",
+      shop:        "./pages/shop/shop.html",
+      collections: "./pages/collections/collections.html",
+      duel:        "./pages/duel/duel.html",
+      profile:     "./pages/profile/profile.html",
+    };
+  }
 }
 
 function setActiveRoute(route) {
@@ -69,11 +80,8 @@ function go(route) {
 }
 
 function assetPrefix() {
-  const path = location.pathname.replaceAll("\\", "/");
-  const parts = path.split("/").filter(Boolean);
-  const isGithub = location.hostname.endsWith("github.io");
-  const BASE_PATH = isGithub && parts.length ? `/${parts[0]}/` : "/";
-  return BASE_PATH;
+  const inPages = location.pathname.toLowerCase().includes("/pages/");
+  return inPages ? "../../" : "./";
 }
 
 function fmtK(n) {
@@ -186,70 +194,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadGameData();
   } catch (err) {
     console.warn("[ui-shell] failed to load game data (fetch). Navigation/HUD will still work.", err);
-  }
-
-  // Показувати головну сторінку при першому відкритті сайту
-  try {
-    const FIRST_KEY = "cardastika:firstRunShown";
-    if (!localStorage.getItem(FIRST_KEY)) {
-      // Встановлюємо прапорець щоб модальне вітання не показувалось повторно
-      localStorage.setItem(FIRST_KEY, "1");
-
-      // Показуємо модальне вітання поверх поточної сторінки
-      const inPages = location.pathname.toLowerCase().includes("/pages/");
-      const authPath = inPages ? "../auth/auth.html" : "./pages/auth/auth.html";
-
-      const overlay = document.createElement("div");
-      overlay.className = "welcome-modal";
-      overlay.style.position = "fixed";
-      overlay.style.inset = "0";
-      overlay.style.background = "rgba(0,0,0,0.6)";
-      overlay.style.display = "flex";
-      overlay.style.alignItems = "center";
-      overlay.style.justifyContent = "center";
-      overlay.style.zIndex = "9999";
-
-      const card = document.createElement("div");
-      card.className = "welcome-card";
-      card.style.width = "520px";
-      card.style.maxWidth = "92%";
-      card.style.background = "linear-gradient(#1b120d, #0f0a08)";
-      card.style.border = "1px solid rgba(255,215,130,0.12)";
-      card.style.padding = "28px";
-      card.style.borderRadius = "12px";
-      card.style.boxShadow = "0 6px 30px rgba(0,0,0,0.6)";
-      card.style.color = "#f3e7d2";
-      card.style.textAlign = "center";
-
-      card.innerHTML = `
-        <h1 style="font-family: 'EB Garamond', serif; font-size:48px; margin:0 0 8px;">Cardastika</h1>
-        <p style="margin:0 0 20px; font-size:16px; color:#eedfbf">Збери унікальну колоду магічних карт і кинь виклик стихіям.</p>
-        <div style="display:flex; gap:12px; justify-content:center; margin-top:18px">
-          <button id="welcomeStartBtn" style="background:#8f6f39; color:white; border:none; padding:12px 24px; border-radius:8px; font-size:16px;">Почати гру</button>
-          <button id="welcomeLoginBtn" style="background:#1e5e85; color:white; border:none; padding:12px 24px; border-radius:8px; font-size:16px">Вхід для гравців</button>
-        </div>
-      `;
-
-      overlay.appendChild(card);
-      document.body.appendChild(overlay);
-
-      const removeModal = () => {
-        try { overlay.remove(); } catch(e) {}
-      };
-
-      document.getElementById("welcomeStartBtn")?.addEventListener("click", (e) => {
-        e.preventDefault();
-        removeModal();
-      });
-
-      document.getElementById("welcomeLoginBtn")?.addEventListener("click", (e) => {
-        e.preventDefault();
-        // Перехід на сторінку авторизації
-        location.href = authPath;
-      });
-    }
-  } catch (e) {
-    // ignore
   }
 
   const route = guessRouteFromPath();
