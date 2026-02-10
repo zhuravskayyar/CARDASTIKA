@@ -1,26 +1,29 @@
-import "../../src/account.js";
+﻿import "../../src/account.js";
 
 const STORAGE = {
   pityPrefix: "cardastika:shop:pity:",
 };
-const SHOP_POOL_ROTATION_VERSION = "2026-02-07-v2";
+
+const SHOP_POOL_ROTATION_VERSION = "2026-02-10-v3";
 
 const QUALITY_LABEL = {
   uncommon: "незвичайні",
-  rare: "рідкісні",
+  rare: "рідкі",
   epic: "епічні",
   legendary: "легендарні",
   mythic: "міфічні",
 };
 
+const QUALITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary", "mythic"];
+
 const OFFER_VIEW = {
   silver_500: {
-    title: "Карта за 500",
+    title: "Карти за 500",
     priceLabel: "Купити за 500",
     offerBuyParam: "silver_500",
     oddsRows: [
       { id: "epic", quality: "epic", label: "шанс отримати епічну карту", initialChance: 16 },
-      { id: "rare", quality: "rare", label: "шанс отримати рідкісну карту", initialChance: 5 },
+      { id: "rare", quality: "rare", label: "шанс отримати рідкісну карту", initialChance: 17.5 },
     ],
     pools: [
       { quality: "epic", count: 8 },
@@ -29,7 +32,7 @@ const OFFER_VIEW = {
     ],
   },
   gold_50: {
-    title: "Карта за 50",
+    title: "Карти за 50",
     priceLabel: "Купити за 50",
     offerBuyParam: "gold_50",
     oddsRows: [
@@ -43,7 +46,7 @@ const OFFER_VIEW = {
     ],
   },
   gold_150: {
-    title: "Карта за 150",
+    title: "Карти за 150",
     priceLabel: "Купити за 150",
     offerBuyParam: "gold_150",
     oddsRows: [
@@ -55,6 +58,10 @@ const OFFER_VIEW = {
     ],
   },
 };
+
+function getBasePath() {
+  return location.pathname.toLowerCase().includes("/pages/") ? "../../" : "./";
+}
 
 function asNum(x, fallback = 0) {
   const n = Number(x);
@@ -90,7 +97,7 @@ function normalizeElement(raw) {
 
 function normalizeQuality(raw) {
   const s = String(raw || "").toLowerCase().trim();
-  if (["common", "uncommon", "rare", "epic", "legendary", "mythic"].includes(s)) return s;
+  if (QUALITY_ORDER.includes(s)) return s;
   if (s === "rarity-1") return "common";
   if (s === "rarity-2") return "uncommon";
   if (s === "rarity-3") return "rare";
@@ -98,6 +105,15 @@ function normalizeQuality(raw) {
   if (s === "rarity-5") return "legendary";
   if (s === "rarity-6") return "mythic";
   return "common";
+}
+
+function qualityRank(q) {
+  const idx = QUALITY_ORDER.indexOf(normalizeQuality(q));
+  return idx >= 0 ? idx : 0;
+}
+
+function normalizeTitle(s) {
+  return String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 function rarityClassFromQuality(q) {
@@ -109,18 +125,7 @@ function rarityClassFromQuality(q) {
   return "rarity-1";
 }
 
-function escapeXml(s) {
-  return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
-
-function buildPlaceholderArt(element, title = "") {
-  // Placeholders are removed — return empty string so no placeholder image is used.
-  return "";
+function weekIndexUtc(date = new Date()) {
   const oneDay = 24 * 60 * 60 * 1000;
   const utc = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
   const weekday = (new Date(utc).getUTCDay() + 6) % 7;
@@ -138,16 +143,6 @@ function hashStr(input) {
   return h >>> 0;
 }
 
-function weekRangeLabel(now = new Date()) {
-  const oneDay = 24 * 60 * 60 * 1000;
-  const utc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const weekday = (new Date(utc).getUTCDay() + 6) % 7;
-  const monday = new Date(utc - weekday * oneDay);
-  const nextMonday = new Date(monday.getTime() + 7 * oneDay);
-  const fmt = (d) => `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-  return `${fmt(monday)} - ${fmt(new Date(nextMonday.getTime() - oneDay))}`;
-}
-
 function sortForWeek(list, { offerId, quality, week }) {
   const copy = list.slice();
   copy.sort((a, b) => {
@@ -158,268 +153,116 @@ function sortForWeek(list, { offerId, quality, week }) {
   return copy;
 }
 
-function getBasePath() {
-  return location.pathname.toLowerCase().includes("/pages/") ? "../../" : "./";
+function uniqueById(items) {
+  const out = [];
+  const seen = new Set();
+  for (const item of items) {
+    const id = String(item?.id || "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(item);
+  }
+  return out;
 }
 
-async function loadCards() {
-  const base = getBasePath();
-  const collectionShopFlagByTitle = new Map();
+async function fetchJson(relPath) {
+  const r = await fetch(`${getBasePath()}${relPath}`, { cache: "no-store" });
+  if (!r.ok) throw new Error(`${relPath} fetch failed: ${r.status}`);
+  return r.json();
+}
+
+function extractCards(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (payload && Array.isArray(payload.cards)) return payload.cards;
+  return [];
+}
+
+function isShopCollection(col) {
+  const source = String(col?.source || "").toLowerCase();
+  const link = String(col?.sourceLink || "").toLowerCase();
+  return source.includes("shop") || source.includes("крамниц") || source.includes("магаз") || link.includes("/shop/") || link.includes("shop.html");
+}
+
+function normalizeCard(raw, fallback = {}) {
+  const id = String(raw?.id || fallback.id || "").trim();
+  if (!id || id.startsWith("starter_")) return null;
+
+  return {
+    id,
+    title: String(raw?.title ?? raw?.name ?? fallback.title ?? id).trim() || id,
+    element: normalizeElement(raw?.element ?? fallback.element),
+    quality: normalizeQuality(raw?.rarity ?? raw?.quality ?? fallback.quality),
+    artFile: String(raw?.artFile || fallback.artFile || "").trim(),
+  };
+}
+
+async function loadPoolCards() {
+  const [cardsData, collectionsData] = await Promise.all([
+    fetchJson("data/cards.json"),
+    fetchJson("data/collections.json").catch(() => ({ collections: [] })),
+  ]);
+
   const byId = new Map();
-  const pushCard = (raw) => {
-    if (!raw || typeof raw !== "object") return;
-    const id = String(raw.id || "").trim();
-    if (!id || id.startsWith("starter_")) return;
-    const existing = byId.get(id) || {
-      id,
-      title: String(raw.title ?? raw.name ?? id),
-      element: normalizeElement(raw.element),
-      quality: normalizeQuality(raw.rarity),
-      collections: [],
-      shopBuyable: false,
-    };
-    const rawCollections = Array.isArray(raw.collections) ? raw.collections : [];
-    for (const c of rawCollections) {
-      const title = String(c || "").trim();
-      if (!title) continue;
-      if (!existing.collections.includes(title)) existing.collections.push(title);
+  const byTitle = new Map();
+  for (const raw of extractCards(cardsData)) {
+    const card = normalizeCard(raw);
+    if (!card) continue;
+    byId.set(card.id, card);
+    const key = normalizeTitle(card.title);
+    if (key && !byTitle.has(key)) byTitle.set(key, card.id);
+  }
+
+  const collections = Array.isArray(collectionsData?.collections) ? collectionsData.collections : [];
+  const shopCardIds = new Set();
+
+  for (const col of collections) {
+    const colCards = Array.isArray(col?.cards) ? col.cards : [];
+    const shop = isShopCollection(col);
+
+    for (const raw of colCards) {
+      const rawId = String(raw?.id || "").trim();
+      if (!rawId) continue;
+
+      const titleKey = normalizeTitle(raw?.title ?? raw?.name ?? rawId);
+      const mappedId = byId.has(rawId)
+        ? rawId
+        : (titleKey && byTitle.has(titleKey) ? byTitle.get(titleKey) : "");
+
+      if (!mappedId || !byId.has(mappedId)) continue;
+
+      const current = byId.get(mappedId);
+      const merged = normalizeCard(raw, current);
+      if (!merged) continue;
+
+      merged.id = current.id;
+      merged.title = current.title || merged.title;
+      merged.artFile = current.artFile || merged.artFile;
+      if (qualityRank(current.quality) > qualityRank(merged.quality)) merged.quality = current.quality;
+
+      byId.set(mappedId, merged);
+      if (shop) shopCardIds.add(mappedId);
     }
-    byId.set(id, existing);
+  }
+
+  return {
+    cards: [...byId.values()],
+    shopCardIds,
   };
-
-  {
-    let loaded = false;
-    for (const file of ["data/cards.json"]) {
-      try {
-        const r = await fetch(`${base}${file}`, { cache: "no-store" });
-        if (!r.ok) continue;
-        const json = await r.json();
-        const cards = Array.isArray(json?.cards) ? json.cards : [];
-        for (const c of cards) pushCard(c);
-        loaded = true;
-        break;
-      } catch {
-        // try next source
-      }
-    }
-    if (!loaded) throw new Error("card catalog fetch failed");
-  }
-
-  try {
-    const rc = await fetch(`${base}data/collections.json`, { cache: "no-store" });
-    if (rc.ok) {
-      const jc = await rc.json();
-      const cols = Array.isArray(jc?.collections) ? jc.collections : [];
-      for (const col of cols) {
-        const colTitle = String(col?.title || col?.id || "").trim();
-        const source = String(col?.source || "").toLowerCase();
-        const sourceLink = String(col?.sourceLink || "").toLowerCase();
-        const isShopCollection =
-          source.includes("магаз") ||
-          source.includes("крамниц") ||
-          source.includes("shop") ||
-          sourceLink.includes("/shop/") ||
-          sourceLink.includes("shop.html");
-        if (colTitle) collectionShopFlagByTitle.set(colTitle, isShopCollection);
-        const colCards = Array.isArray(col?.cards) ? col.cards : [];
-        for (const c of colCards) {
-          pushCard(c);
-          const id = String(c?.id || "").trim();
-          if (!id || !byId.has(id) || !colTitle) continue;
-          const row = byId.get(id);
-          if (!row.collections.includes(colTitle)) row.collections.push(colTitle);
-          if (isShopCollection) row.shopBuyable = true;
-        }
-      }
-    }
-  } catch {
-    // ignore, cards.json data is already loaded
-  }
-
-  for (const row of byId.values()) {
-    if (row.shopBuyable) continue;
-    for (const t of row.collections || []) {
-      if (collectionShopFlagByTitle.get(t) === true) {
-        row.shopBuyable = true;
-        break;
-      }
-    }
-  }
-
-  return [...byId.values()];
 }
 
-async function loadDetailIndex() {
-  const base = getBasePath();
-  const bioById = new Map();
-  const titleById = new Map();
-  const collectionsByCardId = new Map();
+function pickCardsForSection(cards, shopCardIds, offerId, quality, count, usedIds = new Set()) {
+  const inTier = uniqueById(cards.filter((c) => c.quality === quality && !usedIds.has(c.id)));
+  if (!inTier.length || count <= 0) return [];
 
-  try {
-    const r = await fetch(`${base}data/card-bio.json`, { cache: "no-store" });
-    if (r.ok) {
-      const j = await r.json();
-      const bios = j && typeof j === "object" && j.bios && typeof j.bios === "object" ? j.bios : {};
-      for (const [id, bio] of Object.entries(bios)) {
-        const key = String(id || "").trim();
-        if (!key) continue;
-        bioById.set(key, String(bio || "").trim());
-      }
-    }
-  } catch {
-    // ignore
-  }
+  const week = weekIndexUtc(new Date());
+  const shopTier = inTier.filter((c) => shopCardIds.has(c.id));
+  const extraTier = inTier.filter((c) => !shopCardIds.has(c.id));
 
-  try {
-    const r = await fetch(`${base}data/cards.json`, { cache: "no-store" });
-    if (r.ok) {
-      const j = await r.json();
-      const cards = Array.isArray(j?.cards) ? j.cards : [];
-      for (const c of cards) {
-        const id = String(c?.id || "").trim();
-        if (!id) continue;
-        const title = String(c?.title ?? c?.name ?? id).trim();
-        if (title) titleById.set(id, title);
-        const cRows = Array.isArray(c?.collections) ? c.collections : [];
-        for (const cTitle of cRows) {
-          const t = String(cTitle || "").trim();
-          if (!t) continue;
-          if (!collectionsByCardId.has(id)) collectionsByCardId.set(id, []);
-          collectionsByCardId.get(id).push({ title: t, source: "cards.json" });
-        }
-      }
-    }
-  } catch {
-    // ignore
-  }
+  const primary = sortForWeek(shopTier, { offerId, quality, week });
+  const secondary = sortForWeek(extraTier, { offerId, quality, week });
+  const merged = uniqueById([...primary, ...secondary]);
 
-  try {
-    const r = await fetch(`${base}data/collections.json`, { cache: "no-store" });
-    if (r.ok) {
-      const j = await r.json();
-      const cols = Array.isArray(j?.collections) ? j.collections : [];
-      for (const col of cols) {
-        const colTitle = String(col?.title || col?.id || "Коллекция");
-        const source = String(col?.source || "").trim();
-        const cards = Array.isArray(col?.cards) ? col.cards : [];
-        for (const c of cards) {
-          const id = String(c?.id || "").trim();
-          if (!id) continue;
-          if (!titleById.has(id)) {
-            const t = String(c?.title || id).trim();
-            if (t) titleById.set(id, t);
-          }
-          if (!collectionsByCardId.has(id)) collectionsByCardId.set(id, []);
-          collectionsByCardId.get(id).push({ title: colTitle, source });
-        }
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  const bioByTitle = new Map();
-  for (const [id, bio] of bioById.entries()) {
-    const title = String(titleById.get(id) || "").trim().toLowerCase();
-    if (!title || !bio) continue;
-    if (!bioByTitle.has(title)) bioByTitle.set(title, bio);
-  }
-
-  return { bioById, bioByTitle, collectionsByCardId };
-}
-
-function setupCardModal(detailIndex) {
-  const modal = document.getElementById("poolCardModal");
-  const titleEl = document.getElementById("poolCardTitle");
-  const artEl = document.getElementById("poolCardArt");
-  const bioEl = document.getElementById("poolCardBio");
-  const colsEl = document.getElementById("poolCardCollections");
-  const srcEl = document.getElementById("poolCardSources");
-  if (!modal || !titleEl || !artEl || !bioEl || !colsEl || !srcEl) {
-    return { open: () => {}, close: () => {} };
-  }
-
-  const close = () => {
-    modal.classList.remove("is-open");
-    modal.setAttribute("aria-hidden", "true");
-  };
-
-  modal.querySelectorAll("[data-close-modal]").forEach((el) => {
-    el.addEventListener("click", close);
-  });
-
-  const open = (card) => {
-    const id = String(card?.id || "").trim();
-    const title = String(card?.title || "Карта");
-    const element = normalizeElement(card?.element);
-    titleEl.textContent = title;
-    const artBg = buildPlaceholderArt(element, title);
-    if (artBg) artEl.style.backgroundImage = `url('${artBg}')`;
-
-    const byId = String(detailIndex?.bioById?.get(id) || "").trim();
-    const byTitle = String(detailIndex?.bioByTitle?.get(title.toLowerCase()) || "").trim();
-    const fallbackBio = `Карта стихії ${element || "earth"}: ${title}. Джерело залежить від колекції карти.`;
-    const bio = byId || byTitle || fallbackBio;
-    bioEl.textContent = bio;
-
-    colsEl.textContent = "";
-    const rows = Array.isArray(detailIndex?.collectionsByCardId?.get(id)) ? detailIndex.collectionsByCardId.get(id) : [];
-    if (!rows.length) {
-      const li = document.createElement("li");
-      li.textContent = "Колекція не вказана.";
-      colsEl.appendChild(li);
-    } else {
-      const seen = new Set();
-      for (const row of rows) {
-        const key = `${row.title}|${row.source}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const li = document.createElement("li");
-        li.textContent = row.source ? `${row.title} (${row.source})` : row.title;
-        colsEl.appendChild(li);
-      }
-    }
-
-    srcEl.textContent = "";
-    const norm = (s) => String(s || "").trim().toLowerCase();
-    const sourceRows = [];
-    const seenSource = new Set();
-    for (const row of rows) {
-      const raw = String(row?.source || "").trim();
-      if (!raw || norm(raw) === "cards.json") continue;
-      const key = norm(raw);
-      if (seenSource.has(key)) continue;
-      seenSource.add(key);
-      sourceRows.push(raw);
-    }
-
-    if (!sourceRows.length) {
-      const li = document.createElement("li");
-      li.textContent = "Джерело не визначено.";
-      srcEl.appendChild(li);
-    } else {
-      for (const s of sourceRows) {
-        const li = document.createElement("li");
-        li.textContent = s;
-        srcEl.appendChild(li);
-      }
-
-      const hasShopSource = sourceRows.some((s) => {
-        const v = norm(s);
-        return v.includes("магаз") || v.includes("крамниц") || v.includes("shop");
-      });
-      if (!hasShopSource) {
-        const li = document.createElement("li");
-        li.textContent = "Цю карту не можна купити в магазині.";
-        srcEl.appendChild(li);
-      }
-    }
-
-    modal.classList.add("is-open");
-    modal.setAttribute("aria-hidden", "false");
-  };
-
-  return { open, close };
+  return merged.slice(0, Math.min(count, merged.length));
 }
 
 function renderOdds(host, offerId, cfg) {
@@ -441,19 +284,40 @@ function renderOdds(host, offerId, cfg) {
   }
 }
 
-function renderPoolSections(host, offerId, cfg, allCards, { onCardClick } = {}) {
+function buildArtCandidates(card) {
+  const base = `${getBasePath()}assets/cards/arts/`;
+  const out = [];
+  const artFile = String(card?.artFile || "").trim();
+  const id = String(card?.id || "").trim();
+
+  if (id) out.push(base + `${id}.webp`);
+  if (artFile) out.push(base + artFile);
+
+  return [...new Set(out)];
+}
+
+function mountArt(imgEl, candidates) {
+  let idx = 0;
+  const apply = () => {
+    if (idx >= candidates.length) {
+      imgEl.removeAttribute("src");
+      imgEl.classList.add("is-missing-art");
+      return;
+    }
+    imgEl.src = candidates[idx++];
+  };
+
+  imgEl.addEventListener("error", apply);
+  apply();
+}
+
+function renderPoolSections(host, offerId, cfg, cards, shopCardIds, { onCardClick } = {}) {
   host.textContent = "";
-  const week = weekIndexUtc(new Date());
-  const byQuality = new Map();
-  for (const c of allCards) {
-    const q = normalizeQuality(c.quality);
-    if (!byQuality.has(q)) byQuality.set(q, []);
-    byQuality.get(q).push(c);
-  }
+  const usedIds = new Set();
 
   const heading = document.createElement("div");
   heading.className = "shop-pool-now";
-  heading.textContent = "Прямо сейчас в продаже:";
+  heading.textContent = "Прямо зараз у продажу:";
   host.appendChild(heading);
 
   for (const sectionCfg of cfg.pools) {
@@ -465,30 +329,58 @@ function renderPoolSections(host, offerId, cfg, allCards, { onCardClick } = {}) 
     label.textContent = QUALITY_LABEL[sectionCfg.quality] || sectionCfg.quality;
     section.appendChild(label);
 
-    const src = (byQuality.get(sectionCfg.quality) || []).filter(
-      (c) => c.shopBuyable && Array.isArray(c.collections) && c.collections.length > 0,
-    );
-    const sorted = sortForWeek(src, { offerId, quality: sectionCfg.quality, week });
-    const need = Math.max(0, sectionCfg.count);
-    const picked = [];
-    if (sorted.length > 0 && need > 0) {
-      for (let i = 0; i < need; i++) picked.push(sorted[i % sorted.length]);
-    }
-
     const grid = document.createElement("div");
     grid.className = "shop-pool-grid";
+
+    const picked = pickCardsForSection(
+      cards,
+      shopCardIds,
+      offerId,
+      sectionCfg.quality,
+      Math.max(0, sectionCfg.count),
+      usedIds,
+    );
+    for (const c of picked) usedIds.add(c.id);
+
     for (const card of picked) {
       const item = document.createElement("article");
       item.className = "shop-pool-card";
       item.title = card.title;
       item.setAttribute("role", "button");
       item.setAttribute("tabindex", "0");
+      item.style.width = "100%";
+      item.style.minWidth = "0";
 
       const art = document.createElement("div");
-      art.className = `shop-pool-art ${rarityClassFromQuality(sectionCfg.quality)}`.trim();
-      const bg = buildPlaceholderArt(card.element, card.title);
-      if (bg) art.style.backgroundImage = `url('${bg}')`;
+      art.className = "shop-pool-art";
+      art.style.width = "100%";
+      art.style.aspectRatio = "1 / 1";
+      art.style.overflow = "hidden";
+      art.style.position = "relative";
+
+      const slot = document.createElement("div");
+      slot.className = `shop-pool-slot ${rarityClassFromQuality(sectionCfg.quality)}`.trim();
+      slot.style.position = "absolute";
+      slot.style.inset = "0";
+      slot.style.display = "block";
+      slot.style.width = "100%";
+      slot.style.height = "100%";
+
+      const imgEl = document.createElement("img");
+      imgEl.alt = card.title;
+      imgEl.loading = "lazy";
+      imgEl.decoding = "async";
+      imgEl.setAttribute("data-card-id", card.id);
+      imgEl.style.width = "100%";
+      imgEl.style.height = "100%";
+      imgEl.style.objectFit = "cover";
+      imgEl.style.display = "block";
+      mountArt(imgEl, buildArtCandidates(card));
+
+      slot.appendChild(imgEl);
+      art.appendChild(slot);
       item.appendChild(art);
+
       const open = () => {
         if (typeof onCardClick === "function") onCardClick(card);
       };
@@ -499,10 +391,10 @@ function renderPoolSections(host, offerId, cfg, allCards, { onCardClick } = {}) 
           open();
         }
       });
+
       grid.appendChild(item);
     }
 
-    // Center the final incomplete row in a 7-column grid.
     const rem = picked.length % 7;
     if (rem > 0) {
       const startIdx = picked.length - rem;
@@ -546,10 +438,12 @@ async function main() {
       location.href = `./shop.html?buy=${encodeURIComponent(cfg.offerBuyParam)}`;
     });
   }
-  const cards = await loadCards();
+
+  const { cards, shopCardIds } = await loadPoolCards();
+
   const host = document.getElementById("poolSections");
   if (host) {
-    renderPoolSections(host, offerId, cfg, cards, {
+    renderPoolSections(host, offerId, cfg, cards, shopCardIds, {
       onCardClick: (card) => {
         const id = String(card?.id || "").trim();
         if (!id) return;
@@ -565,4 +459,3 @@ document.addEventListener("DOMContentLoaded", () => {
     location.href = "./shop.html";
   });
 });
-

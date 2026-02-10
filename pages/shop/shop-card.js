@@ -27,6 +27,12 @@ function escapeXml(s) {
 function buildPlaceholderArt(element, title = "") {
   // Placeholders are removed — return empty string so no placeholder image is used.
   return "";
+}
+
+async function loadCardById(targetId) {
+  try {
+    const r = await fetch(getPath("data/cards.json"), { cache: "no-store" });
+    if (r.ok) {
       const j = await r.json();
       const cards = Array.isArray(j?.cards) ? j.cards : [];
       const c = cards.find((x) => String(x?.id || "").trim() === targetId) || null;
@@ -37,6 +43,7 @@ function buildPlaceholderArt(element, title = "") {
           element: normalizeElement(c.element),
           collections: Array.isArray(c.collections) ? c.collections.map((x) => String(x || "").trim()).filter(Boolean) : [],
           bio: String(c.bio || "").trim(),
+          artFile: String(c.artFile || "").trim(),
         };
       }
     }
@@ -61,6 +68,7 @@ function buildPlaceholderArt(element, title = "") {
         element: normalizeElement(c?.element),
         collections: colTitle ? [colTitle] : [],
         bio: String(c?.bio || "").trim(),
+        artFile: String(c?.artFile || "").trim(),
       };
     }
   } catch {
@@ -210,10 +218,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     element: "earth",
     collections: [],
     bio: "",
+    artFile: "",
   };
 
   if (titleEl) titleEl.textContent = safeCard.title;
   if (artEl) { const bg = buildPlaceholderArt(safeCard.element, safeCard.title); if (bg) artEl.style.backgroundImage = `url('${bg}')`; }
+  // Global rule: art by id.webp first, then fallback to artFile from catalog.
+  try {
+    const slotImg = document.getElementById('shopCardSlotImg');
+    if (slotImg) {
+      const base = `${getPath('')}assets/cards/arts/`;
+      const candidates = [];
+      if (safeCard.id) candidates.push(`${base}${safeCard.id}.webp`);
+      if (safeCard.artFile) candidates.push(`${base}${String(safeCard.artFile).trim()}`);
+      const uniq = [...new Set(candidates)];
+      let idx = 0;
+      const apply = () => {
+        if (idx >= uniq.length) {
+          slotImg.removeAttribute('src');
+          return;
+        }
+        slotImg.src = uniq[idx++];
+      };
+      slotImg.addEventListener('error', apply);
+      apply();
+    }
+  } catch (e) {
+    // ignore image load errors
+  }
 
   const bioByCard = String(safeCard.bio || "").trim();
   const bioById = String(bios?.[safeCard.id] || "").trim();

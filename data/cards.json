@@ -346,7 +346,7 @@
     {
       "id": "aerie_guard",
       "title": "Фенікс",
-      "element": "air",
+      "element": "fire",
       "basePower": 13,
       "rarity": "common",
       "collections": [
@@ -370,7 +370,7 @@
     {
       "id": "ember_seraph",
       "title": "Валькірія",
-      "element": "fire",
+      "element": "air",
       "basePower": 16,
       "rarity": "rare",
       "collections": [
@@ -381,7 +381,7 @@
     },
     {
       "id": "storm_harbinger",
-      "title": "Сильф",
+      "title": "Бриз",
       "element": "air",
       "basePower": 15,
       "rarity": "rare",
@@ -394,7 +394,7 @@
     {
       "id": "sky_healer",
       "title": "Гарпія",
-      "element": "water",
+      "element": "air",
       "basePower": 13,
       "rarity": "common",
       "collections": [
@@ -454,7 +454,7 @@
     {
       "id": "brook_sprite",
       "title": "Кентавр",
-      "element": "water",
+      "element": "earth",
       "basePower": 12,
       "rarity": "common",
       "collections": [
@@ -466,7 +466,7 @@
     {
       "id": "owl_scout",
       "title": "Сатир",
-      "element": "air",
+      "element": "earth",
       "basePower": 11,
       "rarity": "common",
       "collections": [
@@ -490,7 +490,7 @@
     {
       "id": "wildfire_fox",
       "title": "Пікс",
-      "element": "fire",
+      "element": "earth",
       "basePower": 13,
       "rarity": "common",
       "collections": [
@@ -514,7 +514,7 @@
     {
       "id": "leaf_blade",
       "title": "Перевертень",
-      "element": "air",
+      "element": "earth",
       "basePower": 12,
       "rarity": "common",
       "collections": [
@@ -585,7 +585,7 @@
     },
     {
       "id": "war_elem_tidehammer",
-      "title": "Бойовий Ундін",
+      "title": "Бойова Ундін",
       "element": "water",
       "basePower": 16,
       "rarity": "rare",
@@ -597,7 +597,7 @@
     },
     {
       "id": "war_elem_stormclaw",
-      "title": "Бойовий Гном",
+      "title": "Бойовий Шторм",
       "element": "air",
       "basePower": 16,
       "rarity": "rare",
@@ -622,7 +622,7 @@
     {
       "id": "march8_queen_of_spring",
       "title": "Флора",
-      "element": "air",
+      "element": "earth",
       "basePower": 14,
       "rarity": "uncommon",
       "collections": [
@@ -634,7 +634,7 @@
     {
       "id": "march8_flower_enchantress",
       "title": "Деметра",
-      "element": "water",
+      "element": "earth",
       "basePower": 13,
       "rarity": "common",
       "collections": [
@@ -670,7 +670,7 @@
     {
       "id": "march8_rose_blade",
       "title": "Фея",
-      "element": "fire",
+      "element": "air",
       "basePower": 14,
       "rarity": "uncommon",
       "collections": [
@@ -682,7 +682,7 @@
     {
       "id": "march8_pearl_healer",
       "title": "Білосніжка",
-      "element": "water",
+      "element": "earth",
       "basePower": 14,
       "rarity": "uncommon",
       "collections": [
@@ -694,7 +694,7 @@
     {
       "id": "march8_silk_sorceress",
       "title": "Весталка",
-      "element": "air",
+      "element": "fire",
       "basePower": 13,
       "rarity": "common",
       "collections": [
@@ -706,7 +706,7 @@
     {
       "id": "march8_garden_warden",
       "title": "Аврора",
-      "element": "earth",
+      "element": "fire",
       "basePower": 15,
       "rarity": "rare",
       "collections": [
@@ -718,7 +718,7 @@
     {
       "id": "march8_sun_priestess",
       "title": "Ірида",
-      "element": "fire",
+      "element": "air",
       "basePower": 15,
       "rarity": "rare",
       "collections": [
@@ -730,7 +730,7 @@
     {
       "id": "march8_moon_priestess",
       "title": "Берегиня",
-      "element": "water",
+      "element": "earth",
       "basePower": 15,
       "rarity": "rare",
       "collections": [
@@ -754,7 +754,7 @@
     {
       "id": "march8_honey_alchemist",
       "title": "Зефір",
-      "element": "earth",
+      "element": "air",
       "basePower": 12,
       "rarity": "common",
       "collections": [
@@ -766,7 +766,7 @@
     {
       "id": "march8_crown_of_blossom",
       "title": "Росана",
-      "element": "air",
+      "element": "earth",
       "basePower": 16,
       "rarity": "epic",
       "collections": [
@@ -790,7 +790,7 @@
     {
       "id": "march8_lady_of_banners",
       "title": "Веста",
-      "element": "earth",
+      "element": "fire",
       "basePower": 17,
       "rarity": "epic",
       "collections": [

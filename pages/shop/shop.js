@@ -1105,5 +1105,160 @@ document.addEventListener("DOMContentLoaded", () => {
     console.warn("[shop] init failed", err);
     showToast("Помилка завантаження крамниці.");
   });
+  // populate small card slot previews on shop banners
+  (async function populateShopCardSlots() {
+    try {
+      const base = getPath("");
+      const resp = await fetch(`${base}data/cards.json`, { cache: "no-store" });
+      if (!resp.ok) return;
+      const json = await resp.json();
+      const cards = Array.isArray(json?.cards) ? json.cards : [];
+      const setCardArt = (img, card) => {
+        if (!img || !card) return false;
+        const id = String(card?.id || '').trim();
+        const artFile = String(card?.artFile || '').trim();
+        const candidates = [];
+        // Global rule: prefer art by "<id>.webp".
+        if (id) candidates.push(`${base}assets/cards/arts/${id}.webp`);
+        if (artFile) candidates.push(`${base}assets/cards/arts/${artFile}`);
+        if (!candidates.length) return false;
+        const uniq = [...new Set(candidates)];
+        let idx = 0;
+        const apply = () => {
+          if (idx >= uniq.length) {
+            img.removeEventListener('error', onErr);
+            return;
+          }
+          img.src = uniq[idx++];
+        };
+        const onErr = () => apply();
+        img.addEventListener('error', onErr);
+        apply();
+        return true;
+      };
+      const byQuality = new Map();
+      for (const c of cards) {
+        const q = normalizeQuality(c?.rarity || c?.rarity || "");
+        if (!byQuality.has(q)) byQuality.set(q, []);
+        byQuality.get(q).push(c);
+      }
+      const slots = Array.from(document.querySelectorAll('.card-slot[data-rarity]'));
+      // Group slots by data-banner attribute so we can number arts per banner type
+      const slotsByBanner = new Map();
+      const noBannerSlots = [];
+      for (const slot of slots) {
+        const bn = String(slot.getAttribute('data-banner') || '').trim();
+        if (bn) {
+          if (!slotsByBanner.has(bn)) slotsByBanner.set(bn, []);
+          slotsByBanner.get(bn).push(slot);
+        } else {
+          noBannerSlots.push(slot);
+        }
+      }
+
+      // Helper: week index (UTC) for deterministic weekly rotation
+      function weekIndexUtc(now = new Date()) {
+        const oneDay = 24 * 60 * 60 * 1000;
+        const utc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+        const weekday = (new Date(utc).getUTCDay() + 6) % 7; // Monday=0
+        const mondayUtc = utc - weekday * oneDay;
+        const epochMondayUtc = Date.UTC(2025, 0, 6);
+        return Math.floor((mondayUtc - epochMondayUtc) / (7 * oneDay));
+      }
+
+      // Process banner-numbered slots: choose variant per banner deterministically by week.
+      for (const [banner, arr] of slotsByBanner.entries()) {
+        // determine number of variants N: prefer explicit data-variants on the slot, else probe up to maxVariants
+        const firstSlot = arr[0];
+        let N = Math.max(1, Number(firstSlot.getAttribute('data-variants') || 0));
+        const maxProbe = 8;
+        if (N <= 1) {
+          // probe files banner_1..banner_maxProbe.webp to count available variants
+          for (let i = 1; i <= maxProbe; i++) {
+            try {
+              const testUrl = `${base}assets/cards/arts/${banner}_${i}.webp`;
+              // Attempt HEAD; some servers may not support HEAD — fall back to GET with range if needed
+              const headResp = await fetch(testUrl, { method: 'HEAD' });
+              if (headResp && headResp.ok) N = Math.max(N, i);
+            } catch {
+              // ignore individual probe errors
+            }
+          }
+          if (N === 0) N = 1;
+        }
+
+        const week = weekIndexUtc(new Date());
+        const chosen = (week % N) + 1; // 1-based
+
+        for (let i = 0; i < arr.length; i++) {
+          const slot = arr[i];
+          try {
+            const img = slot.querySelector('img');
+            if (!img) continue;
+            // Special-case: elementals banner -> random art from "Елементалі" collection
+            const bnLow = String(banner || '').toLowerCase();
+            if (bnLow.includes('element') || bnLow.includes('елемент') || bnLow.includes('elemental') || bnLow.includes('elementali')) {
+              const elems = cards.filter((c) => {
+                try {
+                  if (Array.isArray(c.collections)) {
+                    for (const t of c.collections) {
+                      if (String(t || '').toLowerCase().includes('елемент') || String(t || '').toLowerCase().includes('element')) return true;
+                    }
+                  }
+                  if (String(c.id || '').toLowerCase().startsWith('elem_')) return true;
+                } catch {
+                  /* ignore */
+                }
+                return false;
+              });
+              const pickElem = elems.length ? elems[Math.floor(Math.random() * elems.length)] : null;
+              if (pickElem && setCardArt(img, pickElem)) {
+                continue;
+              }
+            }
+
+            const fileName = `${banner}_${chosen}.webp`;
+            const url = `${base}assets/cards/arts/${fileName}`;
+            // try HEAD to ensure file exists, fallback to random by-rarity
+            let ok = false;
+            try {
+              const h = await fetch(url, { method: 'HEAD' });
+              ok = h && h.ok;
+            } catch {
+              ok = false;
+            }
+            if (ok) {
+              img.src = url;
+              continue;
+            }
+
+            // fallback: use random art by rarity
+            const q = String(slot.getAttribute('data-rarity') || '').trim();
+            const list = byQuality.get(q) || [];
+            const pick = list.length ? list[Math.floor(Math.random() * list.length)] : null;
+            if (pick) setCardArt(img, pick);
+          } catch (e) {
+            // ignore per-slot errors
+          }
+        }
+      }
+
+      // Process slots without data-banner as before (random art by rarity)
+      for (const slot of noBannerSlots) {
+        try {
+          const q = String(slot.getAttribute('data-rarity') || '').trim();
+          const list = byQuality.get(q) || [];
+          const pick = list.length ? list[Math.floor(Math.random() * list.length)] : null;
+          const img = slot.querySelector('img');
+          if (!img) return;
+          if (pick) setCardArt(img, pick);
+        } catch (e) {
+          // ignore per-slot errors
+        }
+      }
+    } catch (err) {
+      console.warn('[shop] populate slots failed', err);
+    }
+  })();
 });
 
